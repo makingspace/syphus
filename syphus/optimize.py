@@ -63,7 +63,7 @@ def random_swap(group):
     if len(group) >= 2:
         i = np.random.choice(len(group) - 1)
         node_idx = group[i]
-        swapped_idx = group[i +1]
+        swapped_idx = group[i + 1]
         group[i], group[i + 1] = group[i + 1], group[i]
 
         return (node_idx, swapped_idx)
@@ -109,25 +109,6 @@ class Optimizer(object):
     # subclass domain.
     #
 
-    def mark_good_move(self, move, diff_with=None):
-        """
-        Mark a given move as worth reintroducing into the solution at a later
-        point.
-        """
-        pass
-
-    def is_tabu(self, move, test_score=None):
-        """
-        Return whether a move is tabu.
-        """
-        return False
-
-    def mark_tabu(self, move, diff_with=None, cost=None):
-        """
-        Mark a move, or components of it, as tabu.
-        """
-        self.tabu.add(move)
-
     def get_best_score_move(self, X, min_score):
         """
         Generate a neighborhood of possible adjacent moves from the current
@@ -135,17 +116,21 @@ class Optimizer(object):
         """
         # Get a neighborhood of minimally different states.
         neighborhood = self.get_neighborhood(X)
-        score_moves = sorted(((self.objective(move), move) for move in neighborhood), reverse=True)
+        score_moves = sorted(
+            ((self.objective(
+                move, current_state=X, current_score=min_score), move)
+             for move in neighborhood),
+            reverse=True)
         # Remove any tabu moves from the neighborhood.
         non_tabu_score_moves = [(score, move) for score, move in score_moves
                                 if not self.is_tabu(
-                                    move, test_score=score
-                                )]
+                                    move, test_score=score)]
         if non_tabu_score_moves:
             best_score, best_move = non_tabu_score_moves.pop()
             for other_score, other_move in non_tabu_score_moves:
                 if other_score > min_score:
-                    self.mark_tabu(other_move, diff_with=best_move, cost=other_score)
+                    self.mark_tabu(
+                        other_move, diff_with=best_move, cost=best_score)
         else:
             # If no move is allowed, fall back to the 'least inadmissable'
             # move.
@@ -165,7 +150,25 @@ class Optimizer(object):
         """
         Return the initial solution state.
         """
-        raise NotImplemented
+        raise NotImplementedError()
+
+    def objective(self, X):
+        raise NotImplementedError()
+
+    def get_neighborhood(self, X):
+        raise NotImplementedError()
+
+    def mark_tabu(self, move, diff_with=None, cost=None):
+        """
+        Mark a move, or components of it, as tabu.
+        """
+        raise NotImplementedError()
+
+    def is_tabu(self, move, test_score=None):
+        raise NotImplementedError()
+
+    def mark_good_move(self, move, diff_with=None):
+        raise NotImplementedError()
 
     def restart(self):
         """
@@ -222,7 +225,8 @@ class Optimizer(object):
         # Gradually decrease the aspiration criteria, tightening the tabu
         # restrictions.
         for criterion in self.aspiration_criteria:
-            self.aspiration_criteria[criterion] *= self.CRITERIA_REDUCTION_MULTIPLIER
+            self.aspiration_criteria[
+                criterion] *= self.CRITERIA_REDUCTION_MULTIPLIER
 
     def optimize(self):
         """
@@ -239,16 +243,21 @@ class Optimizer(object):
             n_iter += 1
             iter_since_last_minimum += 1
 
-            best_score, best_move = self.get_best_score_move(current_solution, min_score)
-
+            best_score, best_move = self.get_best_score_move(current_solution,
+                                                             min_score)
             if best_score >= min_score:
                 # The best score is potentially better than the current
                 # solution, but not better than the known-best solution.
-                self.handle_non_optimal_best(best_move, current_solution, best_score)
+                self.handle_non_optimal_best(best_move, current_solution,
+                                             best_score)
+                if best_score == float('inf'):
+                    self.handle_constraint_failure(best_score, best_move)
+
             else:
                 # Otherwise if it's an improvement, mark the improved-upon
                 # features tabu.
-                self.mark_tabu(current_solution, diff_with=best_move, cost=min_score)
+                self.mark_tabu(
+                    current_solution, diff_with=best_move, cost=min_score)
                 # Mark it as worth returning to.
                 self.mark_good_move(best_move, diff_with=current_solution)
                 iter_since_last_minimum = 0
@@ -269,8 +278,6 @@ class Optimizer(object):
             self.manage_tabu_lifetimes()
             self.manage_aspiration_lifetimes()
 
-        log.debug(
-            "{} minima found on state of size {}".
-            format(self.local_minima_found, len(current_solution))
-        )
+        log.debug("{} minima found on state of size {}".format(
+            self.local_minima_found, len(current_solution)))
         return min_score, min_solution
