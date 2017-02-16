@@ -1,6 +1,7 @@
 import collections
 
-import numpy as np
+import random
+import math
 
 import pytest
 import syphus
@@ -29,8 +30,8 @@ class GenericOptimizer(syphus.Optimizer):
     def _step(self, xy):
         x, y = xy
 
-        step_size = np.random.uniform(-self.x_scale, self.x_scale)
-        step_size2 = np.random.uniform(-self.y_scale, self.y_scale)
+        step_size = random.uniform(-self.x_scale, self.x_scale)
+        step_size2 = random.uniform(-self.y_scale, self.y_scale)
 
         x += step_size
         y += step_size2
@@ -135,7 +136,7 @@ def run_optimizer(optimizer_class, a, b, opt_xy, opt):
 MCCORMICK_X_MIN, MCCORMICK_X_MAX = (-1.5, 4)
 MCCORMICK_Y_MIN, MCCORMICK_Y_MAX = (-3, 4)
 MCCORMICK_OPT_X, MCCORMICK_OPT_Y = (-.54719, -1.54719)
-# The official optimum result is 1.9133, however np's `sin` function produces
+# The official optimum result is 1.9133, however the `sin` function produces
 # this with the above xy.
 MCCORMICK_OPTIMUM = -1.9132
 
@@ -153,12 +154,12 @@ def test_optimize_mccormick(a, b):
         x_min, x_max = MCCORMICK_X_MIN, MCCORMICK_X_MAX
         y_min, y_max = MCCORMICK_Y_MIN, MCCORMICK_Y_MAX
 
-        def objective(self, xy):
+        def objective(self, xy, **kwargs):
             """
             Global minimum = -1.9133, at (-.54719, -1.54719)
             """
             x, y = xy
-            return np.sin(x + y) + (x - y)**2 - 1.5 * x + 2.5 * y + 1
+            return math.sin(x + y) + (x - y)**2 - 1.5 * x + 2.5 * y + 1
 
     best_score = run_optimizer(McCormickOptimizer, a, b,
                                (MCCORMICK_OPT_X, MCCORMICK_OPT_Y),
@@ -197,9 +198,9 @@ def test_optimize_bukin(a, b):
         x_min, x_max = BUKIN_X_MIN, BUKIN_X_MAX
         y_min, y_max = BUKIN_Y_MIN, BUKIN_Y_MAX
 
-        def objective(self, xy):
+        def objective(self, xy, **kwargs):
             x, y = xy
-            return 100 * np.sqrt(abs(y - .01 * x**2)) + .01 * abs(x + 10)
+            return 100 * math.sqrt(abs(y - .01 * x**2)) + .01 * abs(x + 10)
 
     best_score = run_optimizer(BukinOptimizer, a, b,
                                (BUKIN_OPT_X, BUKIN_OPT_Y), BUKIN_OPTIMUM)
@@ -234,10 +235,10 @@ def test_optimize_eggholder(a, b):
         y_min = x_min = EGGHOLDER_MIN
         y_max = x_max = EGGHOLDER_MAX
 
-        def objective(self, xy):
+        def objective(self, xy, **kwargs):
             x, y = xy
-            return (-(y + 47) * np.sin(np.sqrt(abs(y + (x / 2.) + 47))) - x *
-                    np.sin(np.sqrt(abs(x - (y + 47)))))
+            return (-(y + 47) * math.sin(math.sqrt(abs(y + (x / 2.) + 47))) - x *
+                    math.sin(math.sqrt(abs(x - (y + 47)))))
 
     best_score = run_optimizer(EggholderOptimizer, a, b,
                                (EGGHOLDER_OPT_X, EGGHOLDER_OPT_Y),

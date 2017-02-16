@@ -6,7 +6,7 @@ by specific global solvers, as well as generic functions to be used by them.
 import collections
 import logging
 
-import numpy as np
+import random
 
 log = logging.getLogger('syphus.optimize')
 
@@ -15,7 +15,7 @@ def random_choice(group):
     """
     Randomly choose one element of `group`.
     """
-    return np.random.choice(group)
+    return random.choice(group)
 
 
 def random_idx_with_new_value(group, legal_values):
@@ -25,7 +25,7 @@ def random_idx_with_new_value(group, legal_values):
     if group:
         idcs = range(len(group))
         # Get random slot at `group`.
-        idx = np.random.choice(idcs)
+        idx = random.choice(idcs)
         # Get value of slot.
         current_value = group[idx]
         legal_idx_values = [
@@ -33,7 +33,7 @@ def random_idx_with_new_value(group, legal_values):
         ]
         if legal_idx_values:
             # If there are legal values for this idx, pick one.
-            new_value = np.random.choice(legal_idx_values)
+            new_value = random.choice(legal_idx_values)
             return (idx, new_value)
 
     return (None, None)
@@ -61,7 +61,7 @@ def random_swap(group):
     Swap the order of two elements in a group.
     """
     if len(group) >= 2:
-        i = np.random.choice(len(group) - 1)
+        i = random.choice(len(group) - 1)
         node_idx = group[i]
         swapped_idx = group[i + 1]
         group[i], group[i + 1] = group[i + 1], group[i]
