@@ -69,6 +69,16 @@ def random_swap(group):
         return (node_idx, swapped_idx)
 
 
+class Tabu(object):
+
+    __slots__ = ('value', 'criterion', 'lifetime')
+
+    def __init__(self, value, criterion=None, lifetime=1):
+        self.value = value
+        self.criterion = criterion
+        self.lifetime = lifetime
+
+
 class Optimizer(object):
     """
     Parent class for implementing Tabu Search optimizers.
@@ -87,18 +97,11 @@ class Optimizer(object):
     MAX_ITER = 150
     MAX_SINCE_MINIMUM = 30
     MAX_TABU_SIZE = None
-    CRITERIA_REDUCTION_MULTIPLIER = .9
+    CRITERIA_REDUCTION_MULTIPLIER = 1.1
 
     def __init__(self):
         # A queue of solution components that are tabu-active.
         self.tabu = collections.deque()
-        # A record of the time-to-expiration of each tabu-active component.
-        self.tabu_lifetimes = collections.Counter()
-
-        # A record of the criteria to override a tabu-active component.
-        self.aspiration_criteria = {}
-        self.aspiration_criteria_lifetimes = collections.Counter()
-
         # Initialize counter for debugging purposes.
         self.global_minima_found = 0
 
@@ -116,25 +119,24 @@ class Optimizer(object):
         """
         # Get a neighborhood of minimally different states.
         neighborhood = self.get_neighborhood(X)
-        score_moves = sorted(
-            ((self.objective(
-                move, current_state=X, current_score=min_score), move)
-             for move in neighborhood),
-            reverse=True)
-        # Remove any tabu moves from the neighborhood.
-        non_tabu_score_moves = [(score, move) for score, move in score_moves
-                                if not self.is_tabu(
-                                    move, test_score=score)]
-        if non_tabu_score_moves:
-            best_score, best_move = non_tabu_score_moves.pop()
-            for other_score, other_move in non_tabu_score_moves:
-                if other_score > min_score:
-                    self.mark_tabu(
-                        other_move, diff_with=best_move, cost=best_score)
-        else:
+        score_moves = sorted((self.objective(
+            move, current_state=X, current_score=min_score), move)
+                             for move in neighborhood)
+        best_score, best_move = (None, None)
+        # Iterate through the sorted score moves, picking the lowest (first)
+        # one available.
+        for score, move in score_moves:
+            if best_score is None and not self.is_tabu(move, test_score=score):
+                best_score, best_move = (score, move)
+            elif best_score is not None and score > min_score:
+                self.mark_tabu(move, diff_with=best_move, cost=score)
+            else:
+                self.mark_good_move(move, diff_with=X)
+
+        if best_score is None:
             # If no move is allowed, fall back to the 'least inadmissable'
             # move.
-            best_score, best_move = min(score_moves)
+            best_score, best_move = score_moves[0]
 
         return best_score, best_move
 
@@ -180,53 +182,24 @@ class Optimizer(object):
     # === Optimization Logic ===
     #
 
-    def _manage_set_lifetimes(self, set_name):
-        """
-        Expire elements from various data structures by tracking their
-        lifetimes in an associated lifetime structure and removing them after
-        their lifetimes are up.
-        """
-        move_set = getattr(self, set_name)
-        move_lifetimes = getattr(self, "{}_lifetimes".format(set_name))
-
-        to_remove = []
-        for item in move_set:
-            if move_lifetimes[item] <= 0:
-                to_remove.append(item)
-            else:
-                move_lifetimes[item] -= 1
-
-        for item in to_remove:
-            try:
-                move_set.remove(item)
-            except AttributeError:
-                del move_set[item]
-
-        for item, count in move_lifetimes.items():
-            if count <= 0:
-                del self.tabu_lifetimes[item]
-
-    def manage_tabu_lifetimes(self):
+    def manage_tabu_data(self):
         """
         Adjust tabu lifetimes and remove any aged elements from the tabu set.
         """
-        self._manage_set_lifetimes('tabu')
+        to_remove = set()
+        for element in self.tabu:
+            if element.lifetime <= 0:
+                to_remove.add(element)
+            else:
+                element.lifetime -= 1
+                element.criterion *= self.CRITERIA_REDUCTION_MULTIPLIER
+
+        for element in to_remove:
+            self.tabu.remove(element)
 
         if self.MAX_TABU_SIZE:
             while len(self.tabu) > self.MAX_TABU_SIZE:
                 self.tabu.popleft()
-
-    def manage_aspiration_lifetimes(self):
-        """
-        Adjust aspiration criteria lifetimes and remove any aged elements from
-        the aspiration set.
-        """
-        self._manage_set_lifetimes('aspiration_criteria')
-        # Gradually decrease the aspiration criteria, tightening the tabu
-        # restrictions.
-        for criterion in self.aspiration_criteria:
-            self.aspiration_criteria[
-                criterion] *= self.CRITERIA_REDUCTION_MULTIPLIER
 
     def optimize(self):
         """
@@ -275,8 +248,7 @@ class Optimizer(object):
             else:
                 current_solution = best_move
 
-            self.manage_tabu_lifetimes()
-            self.manage_aspiration_lifetimes()
+            self.manage_tabu_data()
 
         log.debug("{} minima found on state of size {}".format(
             self.local_minima_found, len(current_solution)))
