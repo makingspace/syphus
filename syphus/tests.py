@@ -50,48 +50,27 @@ class GenericOptimizer(syphus.Optimizer):
         x, y = xy
         return ((0, round(x, 4)), (1, round(y, 4)))
 
-    def _update_lifetimes(self, lifetimes, xy, diff_with):
-        x_component, y_component = self._decompose(xy)
-
-        if diff_with is not None:
-            x, y = xy
-            other_x, other_y = diff_with
-            delta_x, delta_y = abs(other_x - x), abs(other_y - y)
-            ratio_x, ratio_y = (delta_x / self.x_scale, delta_y / self.y_scale)
-        else:
-            ratio_x = .1
-            ratio_y = .1
-
-        def lifetime(ratio):
-            return max(1, int(100 * ratio))
-
-        lifetimes[x_component] += lifetime(ratio_x)
-        lifetimes[y_component] += lifetime(ratio_y)
-
     def mark_tabu(self, xy, diff_with=None, cost=None):
-        x_component, y_component = self._decompose(xy)
+        decomposed = self._decompose(xy)
 
-        self.tabu.append(x_component)
-        self.tabu.append(y_component)
+        for i in xrange(1):
+            value = xy[i]
+            other_value = diff_with[i]
+            delta = abs(other_value - value)
+            ratio = delta / (self.x_scale, self.y_scale)[i]
 
-        self._update_lifetimes(self.tabu_lifetimes, xy, diff_with)
-        # Set up aspiration criteria for these tabu components. To consider
-        # them admissable, the resulting score would need to be lower than the
-        # cost set here.
-        if cost is not None:
-            self.aspiration_criteria[x_component] = cost
-            self.aspiration_criteria[y_component] = cost
-            self._update_lifetimes(self.aspiration_criteria_lifetimes, xy,
-                                   diff_with)
+            def lifetime(ratio):
+                return max(1, int(100 * ratio))
+
+            tabu = syphus.Tabu(
+                value=decomposed[i], lifetime=lifetime(ratio), criterion=cost)
+            self.tabu.append(tabu)
 
     def _is_tabu(self, move, test_score):
-        if move in self.tabu:
-            if test_score is None or move not in self.aspiration_criteria:
-                return True
-            else:
-                return test_score < self.aspiration_criteria[move]
-        else:
-            return False
+        for tabu in self.tabu:
+            if tabu.value == move:
+                return test_score > tabu.criterion
+        return False
 
     def is_tabu(self, xy, test_score=None):
         x_component, y_component = self._decompose(xy)
@@ -107,7 +86,7 @@ class GenericOptimizer(syphus.Optimizer):
         xy = []
         for i in xrange(2):
             for value, _ in self.cell_memory[i].most_common(6):
-                if (i, value) not in self.tabu:
+                if not self._is_tabu((i, value), float('inf')):
                     xy.append(value)
                     break
             else:
@@ -237,8 +216,8 @@ def test_optimize_eggholder(a, b):
 
         def objective(self, xy, **kwargs):
             x, y = xy
-            return (-(y + 47) * math.sin(math.sqrt(abs(y + (x / 2.) + 47))) - x *
-                    math.sin(math.sqrt(abs(x - (y + 47)))))
+            return (-(y + 47) * math.sin(math.sqrt(abs(y + (x / 2.) + 47))) - x
+                    * math.sin(math.sqrt(abs(x - (y + 47)))))
 
     best_score = run_optimizer(EggholderOptimizer, a, b,
                                (EGGHOLDER_OPT_X, EGGHOLDER_OPT_Y),
