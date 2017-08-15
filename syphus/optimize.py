@@ -61,7 +61,7 @@ def random_swap(group):
     Swap the order of two elements in a group.
     """
     if len(group) >= 2:
-        i = random.choice(len(group) - 1)
+        i = random.randint(0, len(group) - 2)
         node_idx = group[i]
         swapped_idx = group[i + 1]
         group[i], group[i + 1] = group[i + 1], group[i]
