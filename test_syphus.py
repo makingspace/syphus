@@ -44,7 +44,7 @@ class GenericOptimizer(syphus.Optimizer):
         return (x, y)
 
     def get_neighborhood(self, xy):
-        return [self._step(xy) for _ in xrange(20)]
+        return [self._step(xy) for _ in range(20)]
 
     def _decompose(self, xy):
         x, y = xy
@@ -53,7 +53,7 @@ class GenericOptimizer(syphus.Optimizer):
     def mark_tabu(self, xy, diff_with=None, cost=None):
         decomposed = self._decompose(xy)
 
-        for i in xrange(1):
+        for i in range(1):
             value = xy[i]
             other_value = diff_with[i]
             delta = abs(other_value - value)
@@ -84,7 +84,7 @@ class GenericOptimizer(syphus.Optimizer):
 
     def restart(self):
         xy = []
-        for i in xrange(2):
+        for i in range(2):
             for value, _ in self.cell_memory[i].most_common(6):
                 if not self._is_tabu((i, value), float('inf')):
                     xy.append(value)

@@ -4,7 +4,7 @@ from os import path
 here = path.abspath(path.dirname(__file__))
 setup(
     name='syphus',
-    version='1.1',
+    version='1.2',
     description='MakeSpace Hill-Climbing Algorithm',
     url='https://github.com/makingspace/syphus',
     author='Zach Smith',

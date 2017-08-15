@@ -1,9 +1,10 @@
-from optimize import (Optimizer, Tabu, persistent_reassign, random_choice,
-                      random_reassign, random_swap)
+from __future__ import absolute_import
 
-Optimizer = Optimizer
-Tabu = Tabu
-random_choice = random_choice
-random_swap = random_swap
-persistent_reassign = persistent_reassign
-random_reassign = random_reassign
+from . import optimize
+
+Optimizer = optimize.Optimizer
+Tabu = optimize.Tabu
+random_choice = optimize.random_choice
+random_swap = optimize.random_swap
+persistent_reassign = optimize.persistent_reassign
+random_reassign = optimize.random_reassign
