@@ -119,24 +119,27 @@ class Optimizer(object):
         """
         # Get a neighborhood of minimally different states.
         neighborhood = self.get_neighborhood(X)
+        # Sort with best move first.
         score_moves = sorted((self.objective(
             move, current_state=X, current_score=min_score), move)
                              for move in neighborhood)
-        best_score, best_move = (None, None)
+        best_score = best_move = None
         # Iterate through the sorted score moves, picking the lowest (first)
         # one available.
         for score, move in score_moves:
             if best_score is None and not self.is_tabu(move, test_score=score):
                 best_score, best_move = (score, move)
-            elif best_score is not None and score > min_score:
-                self.mark_tabu(move, diff_with=best_move, cost=score)
-            else:
+            # If the score is an improvement (tabu or not), mark it as good.
+            if score < min_score:
                 self.mark_good_move(move, diff_with=X)
 
         if best_score is None:
             # If no move is allowed, fall back to the 'least inadmissable'
             # move.
             best_score, best_move = score_moves[0]
+
+        # Mark tabu wherever we came from.
+        self.mark_tabu(X, diff_with=best_move, cost=min_score)
 
         return best_score, best_move
 
@@ -145,8 +148,7 @@ class Optimizer(object):
         Handle the case where a move has been selected from the neighborhood
         but it's not better than the current optimum.
         """
-        # If the best move is not favorable, mark it tabu.
-        self.mark_tabu(best_move, diff_with=current_solution, cost=best_score)
+        raise NotImplementedError()
 
     def initial_state(self):
         """
@@ -216,8 +218,8 @@ class Optimizer(object):
             n_iter += 1
             iter_since_last_minimum += 1
 
-            best_score, best_move = self.get_best_score_move(current_solution,
-                                                             min_score)
+            best_score, best_move = self.get_best_score_move(
+                current_solution, min_score)
             if best_score >= min_score:
                 # The best score is potentially better than the current
                 # solution, but not better than the known-best solution.
@@ -227,12 +229,6 @@ class Optimizer(object):
                     self.handle_constraint_failure(best_score, best_move)
 
             else:
-                # Otherwise if it's an improvement, mark the improved-upon
-                # features tabu.
-                self.mark_tabu(
-                    current_solution, diff_with=best_move, cost=min_score)
-                # Mark it as worth returning to.
-                self.mark_good_move(best_move, diff_with=current_solution)
                 iter_since_last_minimum = 0
                 self.local_minima_found += 1
                 # Record the current best solution.

@@ -1,7 +1,6 @@
 import collections
-
-import random
 import math
+import random
 
 import pytest
 import syphus
@@ -15,8 +14,8 @@ class GenericOptimizer(syphus.Optimizer):
         self.a = a
         self.b = b
 
-        self.x_scale = (self.x_max - self.x_min) / 6.
-        self.y_scale = (self.y_max - self.y_min) / 6.
+        self.x_scale = (self.x_max - self.x_min) / 7.
+        self.y_scale = (self.y_max - self.y_min) / 7.
         self.MAX_TABU_SIZE = 18
 
         self.cell_memory = [collections.Counter(), collections.Counter()]
@@ -30,16 +29,16 @@ class GenericOptimizer(syphus.Optimizer):
     def _step(self, xy):
         x, y = xy
 
-        step_size = random.uniform(-self.x_scale, self.x_scale)
-        step_size2 = random.uniform(-self.y_scale, self.y_scale)
-
-        x += step_size
-        y += step_size2
-
-        if x < self.x_min or x > self.x_max:
-            x = self.a
-        if y < self.y_min or y > self.y_max:
-            y = self.a
+        if random.choice([True, False]):
+            step_size = random.uniform(-self.x_scale, self.x_scale)
+            x += step_size
+            if x < self.x_min or x > self.x_max:
+                x = self.a
+        else:
+            step_size2 = random.uniform(-self.y_scale, self.y_scale)
+            y += step_size2
+            if y < self.y_min or y > self.y_max:
+                y = self.a
 
         return (x, y)
 
@@ -48,7 +47,7 @@ class GenericOptimizer(syphus.Optimizer):
 
     def _decompose(self, xy):
         x, y = xy
-        return ((0, round(x, 4)), (1, round(y, 4)))
+        return ((0, round(x, 3)), (1, round(y, 3)))
 
     def mark_tabu(self, xy, diff_with=None, cost=None):
         decomposed = self._decompose(xy)
@@ -74,13 +73,17 @@ class GenericOptimizer(syphus.Optimizer):
 
     def is_tabu(self, xy, test_score=None):
         x_component, y_component = self._decompose(xy)
-        return self._is_tabu(x_component, test_score) or self._is_tabu(
+        result = self._is_tabu(x_component, test_score) or self._is_tabu(
             y_component, test_score)
+        return result
+
+    def handle_non_optimal_best(self, best_move, current_solution, best_score):
+        pass
 
     def mark_good_move(self, xy, diff_with=None, cost=None):
-        x, y = xy
-        self.cell_memory[0][round(x, 4)] += 1
-        self.cell_memory[0][round(y, 4)] += 1
+        decomposed_x, decomposed_y = self._decompose(xy)
+        self.cell_memory[decomposed_x[0]][decomposed_x[1]] += 1
+        self.cell_memory[decomposed_y[0]][decomposed_y[1]] += 1
 
     def restart(self):
         xy = []
@@ -88,13 +91,11 @@ class GenericOptimizer(syphus.Optimizer):
             for value, _ in self.cell_memory[i].most_common(6):
                 if not self._is_tabu((i, value), float('inf')):
                     xy.append(value)
+                    del self.cell_memory[i][value]
                     break
             else:
                 raise StopIteration()
         return xy
-
-    def observe(self, best_move, best_score, current_move, current_score):
-        pass
 
 
 def run_optimizer(optimizer_class, a, b, opt_xy, opt):
@@ -122,10 +123,8 @@ MCCORMICK_OPTIMUM = -1.9132
 
 @pytest.mark.optimize
 @given(
-    floats(
-        min_value=MCCORMICK_X_MIN / 2, max_value=MCCORMICK_X_MAX / 2),
-    floats(
-        min_value=MCCORMICK_Y_MIN / 2, max_value=MCCORMICK_Y_MAX / 2))
+    floats(min_value=MCCORMICK_X_MIN / 2, max_value=MCCORMICK_X_MAX / 2),
+    floats(min_value=MCCORMICK_Y_MIN / 2, max_value=MCCORMICK_Y_MAX / 2))
 @settings(max_examples=500)
 def test_optimize_mccormick(a, b):
     class McCormickOptimizer(GenericOptimizer):
@@ -140,8 +139,8 @@ def test_optimize_mccormick(a, b):
             x, y = xy
             return math.sin(x + y) + (x - y)**2 - 1.5 * x + 2.5 * y + 1
 
-    best_score = run_optimizer(McCormickOptimizer, a, b,
-                               (MCCORMICK_OPT_X, MCCORMICK_OPT_Y),
+    best_score = run_optimizer(McCormickOptimizer, a, b, (MCCORMICK_OPT_X,
+                                                          MCCORMICK_OPT_Y),
                                MCCORMICK_OPTIMUM)
 
     delta = best_score - round(MCCORMICK_OPTIMUM, 4)
@@ -166,10 +165,8 @@ BUKIN_OPTIMUM = 0
 
 @pytest.mark.optimize
 @given(
-    floats(
-        min_value=BUKIN_X_MIN / 2, max_value=BUKIN_X_MAX / 2),
-    floats(
-        min_value=BUKIN_Y_MIN / 2, max_value=BUKIN_Y_MAX / 2))
+    floats(min_value=BUKIN_X_MIN / 2, max_value=BUKIN_X_MAX / 2),
+    floats(min_value=BUKIN_Y_MIN / 2, max_value=BUKIN_Y_MAX / 2))
 @settings(max_examples=500)
 def test_optimize_bukin(a, b):
     class BukinOptimizer(GenericOptimizer):
@@ -203,10 +200,8 @@ EGGHOLDER_OPTIMUM = -959.6407
 
 @pytest.mark.optimize
 @given(
-    floats(
-        min_value=EGGHOLDER_MIN / 2, max_value=EGGHOLDER_MAX / 2),
-    floats(
-        min_value=EGGHOLDER_MIN / 2, max_value=EGGHOLDER_MAX / 2))
+    floats(min_value=EGGHOLDER_MIN / 2, max_value=EGGHOLDER_MAX / 2),
+    floats(min_value=EGGHOLDER_MIN / 2, max_value=EGGHOLDER_MAX / 2))
 @settings(max_examples=500)
 def test_optimize_eggholder(a, b):
     class EggholderOptimizer(GenericOptimizer):
@@ -216,11 +211,11 @@ def test_optimize_eggholder(a, b):
 
         def objective(self, xy, **kwargs):
             x, y = xy
-            return (-(y + 47) * math.sin(math.sqrt(abs(y + (x / 2.) + 47))) - x
-                    * math.sin(math.sqrt(abs(x - (y + 47)))))
+            return (-(y + 47) * math.sin(math.sqrt(abs(y + (x / 2.) + 47))) -
+                    x * math.sin(math.sqrt(abs(x - (y + 47)))))
 
-    best_score = run_optimizer(EggholderOptimizer, a, b,
-                               (EGGHOLDER_OPT_X, EGGHOLDER_OPT_Y),
+    best_score = run_optimizer(EggholderOptimizer, a, b, (EGGHOLDER_OPT_X,
+                                                          EGGHOLDER_OPT_Y),
                                EGGHOLDER_OPTIMUM)
 
     delta = best_score - round(EGGHOLDER_OPTIMUM, 4)
