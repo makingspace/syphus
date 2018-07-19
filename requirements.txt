@@ -1,5 +1,0 @@
-hypothesis==3.6.1
-coverage==4.0.3
-python-coveralls==2.7.0
-pytest-cov==2.2.1
-pytest-xdist==1.14
