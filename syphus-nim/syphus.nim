@@ -1,9 +1,40 @@
 ## Implementation of the Tabu Search heuristic.
+##
+## The main API for the Nim version of Syphus is the ``optimize`` proc. It
+## takes a series of user-defined callback procs, which is how to
+## implement a solver for a specific domain problem.
+##
+## The procs to implement are:
+##  - ``initialSolution: SolutionT``: The starting solution state to be  mutated by the solver.
+##  - ``getNeighborhood``: Provide a series of possible next steps from the current solution state.
+##  - ``objective``: Evaluate a solution state.
+##  - ``registerBestScoreMove``: Callback for handling the step selected from the neighborhood.
+##  - ``isTabu``: Determine whether a given solution is currently tabu.
+##  - ``markTabu``: Mark a solution state as tabu.
+##  - ``markGoodMove``: Callback for handling a non-optimal but desirable step.
+##  - ``restart``: Provides a new starting state after some local minimum has been reached.
+##
+## With these callbacks, ``optimize`` will seek the solution space exposed
+## by ``getNeighborhood`` and try to optimize for the lowest cost as returned
+## by ``objective``. The other possible callbacks allow the programmer to
+## design tabu heuristics and implement supplementary data structures to
+## search the space more effectively.
 import options, deques, tables, algorithm, sequtils, math
 
+## Generic types are provided so as to create generic signatures for the
+## callbacks. These types should be concretized with a ``T`` appropriate for
+## the domain of the problem. For instance, in the travelling salesman problem,
+## ``T`` might be a sequence of integers representing indices into a sequence
+## of stops.
 type
-  Score* = float
-  ObjectiveResponse* = tuple[score: Score, stopIteration: bool]
+  Score* = float ## \
+  ## An alias for ``float`` representing the *cost* of a solution under
+  ## a specific objective solution, for instance, the total minutes of
+  ## driving time in a travelling salesman solution.
+  ObjectiveResponse* = tuple[score: Score, stopIteration: bool] ## \
+  ## The value returned by the objective function. In addition to the
+  ## score, ``stopIteration`` allows for early exit from the optimization
+  ## loop if some threshold has been met.
   ScoreSolution*[T] = tuple ## \
     ## A combination of a solution state and that state's score from the
     ## objective function.
@@ -12,14 +43,35 @@ type
 
   Tabu*[T] = object ## \
     ## An object containing a tabu-active element, its time until expiration,
-    ## and the maximum score for it to flag a solution as tabu.
+    ## and the maximum score for it to flag a solution as tabu. An
+    ## tabu-active element is an element of a search space (for instance,
+    ## the assignment of a vehicle to a route, or the ordering of a single
+    ## stop) which is Tabu, meaning that the solution should be passed over
+    ## for one that might be less strictly optimal.
+    ##
+    ## By marking solutions as Tabu (through marking their elements as Tabu)
+    ## we can heuristically control the path of the solver through the solution
+    ## space and avoid local minima.
+    ##
+    ## ``value``: The element associated with the tabu solution.
+    ##
+    ## ``lifetime``: The time that this solution should be tabu.
+    ##
+    ## ``aspirationCriteria``: The score required to override this tabu value. For instance, this
+    ## might be set during ``markTabu`` to the score of the tabu solution, and
+    ## then compared with the current score in ``isTabu``, so that solutions
+    ## whose scores are sufficiently improved can be selected even if their
+    ## elements are tabu.
     value*: T
     lifetime*: int
     aspirationCriteria*: Score
+  TabuQueue*[T] = Deque[Tabu[T]] ## \
+    ## The queue of all currently tabu elements.
 
-  TabuQueue*[T] = Deque[Tabu[T]]
-
-  Response*[T] = object
+  Response*[T] = object ## \
+    ## The type returned by the ``optimize`` function. ``optimize`` will
+    ## return the ``ScoreSolution`` that represents the found optimum, in
+    ## addition to a count of the local minima found during the search.
     scoreSolution*: ScoreSolution[T]
     foundMinima*: int
 
@@ -41,7 +93,8 @@ type
   ## Evaluate a solution state with the objective function to be optimized.
   ## Optionally accepts the current optimum for comparison. Return Inf to
   ## represent constraint failure.
-  RegisterBestScoreMove*[SolutionT] = proc(scoreSolution: ScoreSolution[SolutionT])
+  RegisterBestScoreMove*[SolutionT] = proc(scoreSolution: ScoreSolution[SolutionT]) ## \
+  ## Optional callback when a solution is selected from a neighborhood.
   IsTabu*[SolutionT, TabuElementT] = proc(tabus: var TabuQueue[TabuElementT], scoreSolution: ScoreSolution[SolutionT]): bool ## \
   ## Use tabu memory structures to evaluate a solution state for tabu-ness.
   MarkTabu*[SolutionT, TabuElementT] = proc(tabus: var TabuQueue[TabuElementT], scoreSolution: ScoreSolution[SolutionT], diffWith: SolutionT) ## \
