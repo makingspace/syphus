@@ -5,73 +5,14 @@ by specific global solvers, as well as generic functions to be used by them.
 """
 import collections
 import logging
-
 import random
 
-log = logging.getLogger('syphus.optimize')
-
-
-def random_choice(group):
-    """
-    Randomly choose one element of `group`.
-    """
-    return random.choice(group)
-
-
-def random_idx_with_new_value(group, legal_values):
-    """
-    Randomly pick an element of group and choose a new legal value.
-    """
-    if group:
-        idcs = range(len(group))
-        # Get random slot at `group`.
-        idx = random.choice(idcs)
-        # Get value of slot.
-        current_value = group[idx]
-        legal_idx_values = [
-            value for value in legal_values[idx] if value != current_value
-        ]
-        if legal_idx_values:
-            # If there are legal values for this idx, pick one.
-            new_value = random.choice(legal_idx_values)
-            return (idx, new_value)
-
-    return (None, None)
-
-
-def random_reassign(group, legal_values, **kwargs):
-    idx, value = random_idx_with_new_value(group, legal_values, **kwargs)
-    if idx is not None and value is not None:
-        group[idx] = value
-
-
-def persistent_reassign(group, legal_values):
-    """
-    Random reassignment for persistent data structures.
-    """
-    idx, value = random_idx_with_new_value(group, legal_values)
-    if idx is not None and value is not None:
-        group = group.set(idx, value)
-
-    return idx, group
-
-
-def random_swap(group):
-    """
-    Swap the order of two elements in a group.
-    """
-    if len(group) >= 2:
-        i = random.randint(0, len(group) - 2)
-        node_idx = group[i]
-        swapped_idx = group[i + 1]
-        group[i], group[i + 1] = group[i + 1], group[i]
-
-        return (node_idx, swapped_idx)
+log = logging.getLogger(__name__)
 
 
 class Tabu(object):
 
-    __slots__ = ('value', 'criterion', 'lifetime')
+    __slots__ = ("value", "criterion", "lifetime")
 
     def __init__(self, value, criterion=None, lifetime=1):
         self.value = value
@@ -94,6 +35,7 @@ class Optimizer(object):
     imposing a greater cost in the form of score improvement to justify
     accepting them.
     """
+
     MAX_ITER = 150
     MAX_SINCE_MINIMUM = 30
     MAX_TABU_SIZE = None
@@ -120,9 +62,10 @@ class Optimizer(object):
         # Get a neighborhood of minimally different states.
         neighborhood = self.get_neighborhood(X)
         # Sort with best move first.
-        score_moves = sorted((self.objective(
-            move, current_state=X, current_score=min_score), move)
-                             for move in neighborhood)
+        score_moves = sorted(
+            (self.objective(move, current_state=X, current_score=min_score), move)
+            for move in neighborhood
+        )
         best_score = best_move = None
         # Iterate through the sorted score moves, picking the lowest (first)
         # one available.
@@ -184,7 +127,7 @@ class Optimizer(object):
     # === Optimization Logic ===
     #
 
-    def manage_tabu_data(self):
+    def _manage_tabu_data(self):
         """
         Adjust tabu lifetimes and remove any aged elements from the tabu set.
         """
@@ -219,13 +162,13 @@ class Optimizer(object):
             iter_since_last_minimum += 1
 
             best_score, best_move = self.get_best_score_move(
-                current_solution, min_score)
+                current_solution, min_score
+            )
             if best_score >= min_score:
                 # The best score is potentially better than the current
                 # solution, but not better than the known-best solution.
-                self.handle_non_optimal_best(best_move, current_solution,
-                                             best_score)
-                if best_score == float('inf'):
+                self.handle_non_optimal_best(best_move, current_solution, best_score)
+                if best_score == float("inf"):
                     self.handle_constraint_failure(best_score, best_move)
 
             else:
@@ -244,8 +187,11 @@ class Optimizer(object):
             else:
                 current_solution = best_move
 
-            self.manage_tabu_data()
+            self._manage_tabu_data()
 
-        log.debug("{} minima found on state of size {}".format(
-            self.local_minima_found, len(current_solution)))
+        log.debug(
+            "{} minima found on state of size {}".format(
+                self.local_minima_found, len(current_solution)
+            )
+        )
         return min_score, min_solution
